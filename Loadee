@@ -1,0 +1,33 @@
+-- // OMEGA V16 SECURE LOADER \\ --
+
+-- 1. link right here inside the quotes:
+local GitHub_URL = ""
+
+-- Send a loading notification to your screen
+game:GetService("StarterGui"):SetCore("SendNotification", {
+    Title = "⚡ OMEGA V16",
+    Text = "Fetching master build from GitHub...",
+    Duration = 3,
+})
+
+-- Safely attempt to fetch and load the script
+local success, errorMessage = pcall(function()
+    loadstring(game:HttpGet(GitHub_URL))()
+end)
+
+-- Check if it worked or if GitHub blocked the connection
+if success then
+    game:GetService("StarterGui"):SetCore("SendNotification", {
+        Title = "OMEGA V16",
+        Text = "Injection Successful! Have fun.",
+        Duration = 5,
+    })
+    print("[OMEGA] Successfully injected remote payload.")
+else
+    game:GetService("StarterGui"):SetCore("SendNotification", {
+        Title = "ERROR",
+        Text = "Failed to fetch script. Check Delta console.",
+        Duration = 7,
+    })
+    warn("[OMEGA LOAD ERROR]: " .. tostring(errorMessage))
+end
