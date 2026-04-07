@@ -1,216 +1,203 @@
--- // OMEGA V19 (The "Everything Fixed" Build) \\ --
--- // PART 1: UI & CONFIGURATION
-
+-- // CONFIGURATION & SERVICES \\ --
 local P = game:GetService("Players")
 local R = game:GetService("RunService")
-local U = game:GetService("UserInputService")
-local C = game:GetService("CoreGui")
-local T = game:GetService("TweenService")
-local D = game:GetService("Debris")
-local S = game:GetService("SoundService")
-local L = game:GetService("Lighting")
-
 local LocalPlayer = P.LocalPlayer
 local Cam = workspace.CurrentCamera
 
-if _G.OMEGA_CLEANUP then _G.OMEGA_CLEANUP() end
-local Cons, DrawObj = {}, {}
-local function Draw(c) local o = Drawing.new(c); table.insert(DrawObj, o); return o end
-
-_G.OMEGA_CLEANUP = function() 
-    local old = C:FindFirstChild("NL_Omega"); if old then old:Destroy() end 
-    for _, v in pairs(Cons) do v:Disconnect() end 
-    for _, v in pairs(DrawObj) do v:Remove() end 
-    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then LocalPlayer.Character.Humanoid.AutoRotate = true end 
-    L.Brightness = 1; L.ClockTime = 12; L.FogEnd = 100000; L.GlobalShadows = true
-end
-
-local WeaponData = {["tfz mod-98"]={AP=1015,Tracer=992},["r700"]={AP=1015,Tracer=992},["m4a1"]={AP=1000,Tracer=933},["adar"]={AP=1000,Tracer=933},["svd"]={AP=940,Tracer=885},["mosin"]={AP=940,Tracer=885},["pkm"]={AP=940,Tracer=885},["fn-fal"]={AP=900,Tracer=820},["akmn"]={AP=767,Tracer=715},["sks"]={AP=767,Tracer=715},["saiga 12"]={AP=625,Tracer=405},["mk23"]={AP=515,Tracer=465},["mp5sd"]={AP=500,Tracer=465},["as val"]={AP=357,Tracer=357},["rpg-7"]={AP=115,Tracer=115}}
-
-local O = {
-    Combat = {S_A=false, S_A_Auto=false, S_A_WB=false, Multi=1, AimFOV=150, I_H=false, Pr=true, Vel=933, AimBot=false}, 
-    Vis = {E=true, Chams=false, Bx=true, Sk=true, FOV=true, Dot=true, Info=true, Tracers=true, AimTr=true, Beam=false, FOVSize=150}, 
-    Misc = {TP=false, Zm=false, FOV=90, Heal=false, HS=false, FB=false}, 
-    AA = {Enabled=false, Y=0}
-}
-
-local Colors = {MainBg=Color3.fromRGB(18, 20, 25), SidebarBg=Color3.fromRGB(12, 14, 18), Accent=Color3.fromRGB(50, 160, 255), Text=Color3.fromRGB(230, 230, 230), DarkText=Color3.fromRGB(140, 140, 140), Off=Color3.fromRGB(40, 42, 50), Good=Color3.fromRGB(0, 255, 120)}
-local last_heal, last_auto_shoot = 0, 0
-
--- // UI BUILDER
-local Gui = Instance.new("ScreenGui", C); Gui.Name = "NL_Omega"
-local Main = Instance.new("Frame", Gui); Main.Size = UDim2.new(0, 580, 0, 380); Main.Position = UDim2.new(0.5, -290, 0.5, -190); Main.BackgroundColor3 = Colors.MainBg; Main.BorderSizePixel = 0; Main.Visible = false; Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 6)
-
-local function MakeDraggable(obj)
-    local drag, dragInput, dragStart, startPos
-    obj.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then drag = true; dragStart = input.Position; startPos = obj.Position; input.Changed:Connect(function() if input.UserInputState == Enum.UserInputState.End then drag = false end end) end end)
-    U.InputChanged:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then dragInput = input end end)
-    table.insert(Cons, R.RenderStepped:Connect(function() if drag and dragInput then local delta = dragInput.Position - dragStart; obj.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y) end end))
-end
-MakeDraggable(Main)
-
-local Sidebar = Instance.new("Frame", Main); Sidebar.Size = UDim2.new(0, 130, 1, 0); Sidebar.BackgroundColor3 = Colors.SidebarBg; Sidebar.BorderSizePixel = 0; Instance.new("UIListLayout", Sidebar).Padding = UDim.new(0, 2)
-local Content = Instance.new("Frame", Main); Content.Size = UDim2.new(1, -145, 1, -20); Content.Position = UDim2.new(0, 145, 0, 10); Content.BackgroundTransparency = 1
-
-local Tabs = {}
-local function MakeTab(name)
-    local btn = Instance.new("TextButton", Sidebar); btn.Size = UDim2.new(1, 0, 0, 35); btn.BackgroundTransparency = 1; btn.Text = "  " .. name; btn.TextColor3 = Colors.DarkText; btn.Font = 4; btn.TextSize = 14; btn.TextXAlignment = 0
-    local page = Instance.new("ScrollingFrame", Content); page.Size = UDim2.new(1, 0, 1, 0); page.BackgroundTransparency = 1; page.ScrollBarThickness = 0; page.Visible = false; local lay = Instance.new("UIListLayout", page); lay.FillDirection, lay.Padding, lay.HorizontalAlignment = 1, UDim.new(0, 12), 0
-    btn.MouseButton1Click:Connect(function() for _, t in pairs(Tabs) do t.Btn.TextColor3 = Colors.DarkText; t.Page.Visible = false end; btn.TextColor3 = Colors.Text; page.Visible = true end)
-    table.insert(Tabs, {Btn = btn, Page = page}); return page
-end
-
-local function MakeColumn(page, title)
-    local col = Instance.new("Frame", page); col.Size = UDim2.new(0, 130, 1, 0); col.BackgroundTransparency = 1; Instance.new("UIListLayout", col).Padding = UDim.new(0, 10); local lbl = Instance.new("TextLabel", col); lbl.Size = UDim2.new(1, 0, 0, 20); lbl.BackgroundTransparency = 1; lbl.Text = title:upper(); lbl.TextColor3 = Colors.Accent; lbl.Font = 4; lbl.TextSize = 11; lbl.TextXAlignment = 0; return col
-end
-
-local function Tgl(col, name, tab, key)
-    local r = Instance.new("Frame", col); r.Size = UDim2.new(1, 0, 0, 22); r.BackgroundTransparency = 1; local lbl = Instance.new("TextLabel", r); lbl.Size = UDim2.new(0.7, 0, 1, 0); lbl.BackgroundTransparency = 1; lbl.Text = name; lbl.TextColor3 = Colors.Text; lbl.Font = 3; lbl.TextSize = 13; lbl.TextXAlignment = 0
-    local bg = Instance.new("TextButton", r); bg.Size = UDim2.new(0, 30, 0, 16); bg.Position = UDim2.new(1, -30, 0.5, -8); bg.BackgroundColor3 = tab[key] and Colors.Accent or Colors.Off; bg.Text = ""; Instance.new("UICorner", bg).CornerRadius = UDim.new(1, 0)
-    local kn = Instance.new("Frame", bg); kn.Size = UDim2.new(0, 12, 0, 12); kn.Position = tab[key] and UDim2.new(1, -14, 0.5, -6) or UDim2.new(0, 2, 0.5, -6); kn.BackgroundColor3 = Color3.new(1,1,1); Instance.new("UICorner", kn).CornerRadius = UDim.new(1, 0)
-    bg.MouseButton1Click:Connect(function() tab[key] = not tab[key]; T:Create(bg, TweenInfo.new(0.12), {BackgroundColor3 = tab[key] and Colors.Accent or Colors.Off}):Play(); T:Create(kn, TweenInfo.new(0.12), {Position = tab[key] and UDim2.new(1, -14, 0.5, -6) or UDim2.new(0, 2, 0.5, -6)}):Play() end)
-end
-
-local function Sld(col, name, min, max, tab, key, suf)
-    local r = Instance.new("Frame", col); r.Size = UDim2.new(1, 0, 0, 38); r.BackgroundTransparency = 1; local lbl = Instance.new("TextLabel", r); lbl.Size = UDim2.new(1, 0, 0, 16); lbl.BackgroundTransparency = 1; lbl.Text = name .. ": " .. tab[key] .. (suf or ""); lbl.TextColor3 = Colors.Text; lbl.Font = 3; lbl.TextSize = 12; lbl.TextXAlignment = 0
-    local tr = Instance.new("Frame", r); tr.Size = UDim2.new(1, 0, 0, 4); tr.Position = UDim2.new(0, 0, 1, -10); tr.BackgroundColor3 = Colors.Off; local fil = Instance.new("Frame", tr); fil.Size = UDim2.new((tab[key]-min)/(max-min), 0, 1, 0); fil.BackgroundColor3 = Colors.Accent
-    local kn = Instance.new("TextButton", fil); kn.Size = UDim2.new(0, 10, 0, 10); kn.Position = UDim2.new(1, -5, 0.5, -5); kn.BackgroundColor3 = Color3.new(1,1,1); kn.Text = ""; Instance.new("UICorner", kn).CornerRadius = UDim.new(1, 0)
-    kn.InputBegan:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then local con; con = U.InputChanged:Connect(function(e) if e.UserInputType == Enum.UserInputType.MouseMovement or e.UserInputType == Enum.UserInputType.Touch then local rat = math.clamp((e.Position.X - tr.AbsolutePosition.X) / tr.AbsoluteSize.X, 0, 1); tab[key] = math.floor(min + (rat * (max - min))); lbl.Text = name .. ": " .. tab[key] .. (suf or ""); fil.Size = UDim2.new(rat, 0, 1, 0) end end); local st; st = U.InputEnded:Connect(function(e) if e.UserInputType == Enum.UserInputType.MouseButton1 or e.UserInputType == Enum.UserInputType.Touch then con:Disconnect(); st:Disconnect() end end) end end)
-end
-
--- // TABS BUILD
-local pCombat = MakeTab("Rage"); local cR1 = MakeColumn(pCombat, "Main"); local cR2 = MakeColumn(pCombat, "Settings")
-Tgl(cR1, "Silent Aim", O.Combat, "S_A"); Tgl(cR1, "TriggerBot", O.Combat, "S_A_Auto"); Tgl(cR1, "Omni-Wallbang", O.Combat, "S_A_WB"); Tgl(cR1, "AimBot Smooth", O.Combat, "AimBot"); Tgl(cR1, "Insta Hit", O.Combat, "I_H"); Sld(cR2, "Burst Count", 1, 10, O.Combat, "Multi", "x"); Sld(cR2, "Aim FOV Size", 50, 800, O.Combat, "AimFOV", "px")
-
-local pVisuals = MakeTab("Visuals"); local cV1 = MakeColumn(pVisuals, "ESP"); local cV2 = MakeColumn(pVisuals, "Drawings")
-Tgl(cV1, "Master ESP", O.Vis, "E"); Tgl(cV1, "Outlined Box", O.Vis, "Bx"); Tgl(cV1, "Skeletons", O.Vis, "Sk"); Tgl(cV1, "Neon Chams", O.Vis, "Chams"); Tgl(cV1, "Health Info", O.Vis, "Info"); Tgl(cV2, "Circle Outln", O.Vis, "FOV"); Sld(cV2, "Circle Radius", 50, 800, O.Vis, "FOVSize", "px"); Tgl(cV2, "Target Tracer", O.Vis, "AimTr"); Tgl(cV2, "3D Beams", O.Vis, "Beam")
-
-local pMisc = MakeTab("Misc"); local cM1 = MakeColumn(pMisc, "Local"); local cM2 = MakeColumn(pMisc, "Actions")
-Tgl(cM1, "Neural Heal", O.Misc, "Heal"); Tgl(cM1, "Hit Sounds", O.Misc, "HS"); Tgl(cM1, "Fullbright", O.Misc, "FB"); Tgl(cM1, "3rd Person", O.Misc, "TP"); Tgl(cM1, "Zoom (Z)", O.Misc, "Zm"); Tgl(cM1, "Anti-Aim", O.AA, "Enabled")
-
-Tabs[1].Btn.TextColor3 = Colors.Text; Tabs[1].Page.Visible = true
-
--- // FLOATING ACTION HUB
-local Hub = Instance.new("Frame", Gui); Hub.Size = UDim2.new(0, 160, 0, 45); Hub.Position = UDim2.new(0.5, -80, 0, 10); Hub.BackgroundColor3 = Colors.SidebarBg; Instance.new("UICorner", Hub); MakeDraggable(Hub)
-local function QBtn(n, p, cb) local b = Instance.new("TextButton", Hub); b.Size = UDim2.new(0, 35, 0, 35); b.Position = p; b.BackgroundColor3 = Colors.Off; b.Text = n; b.TextColor3 = Colors.Text; b.Font = 4; b.TextSize = 14; Instance.new("UICorner", b); b.MouseButton1Click:Connect(cb); return b end
-local qMenu = QBtn("NL", UDim2.new(0, 5, 0.5, -17), function() Main.Visible = not Main.Visible end)
-local qZoom = QBtn("Z", UDim2.new(0, 45, 0.5, -17), function() O.Misc.Zm = not O.Misc.Zm end)
-local qTP = QBtn("T", UDim2.new(0, 85, 0.5, -17), function() local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") if hrp then hrp.CFrame = hrp.CFrame * CFrame.new(0, 35, 0) end end)
-local qAim = QBtn("A", UDim2.new(0, 125, 0.5, -17), function() O.Combat.AimBot = not O.Combat.AimBot end)
-
-table.insert(Cons, R.RenderStepped:Connect(function()
-    qZoom.TextColor3 = O.Misc.Zm and Colors.Accent or Colors.Text
-    qAim.TextColor3 = O.Combat.AimBot and Colors.Accent or Colors.Text
-    if O.Misc.FB then L.Brightness = 2; L.ClockTime = 14; L.FogEnd = 100000; L.GlobalShadows = false else L.Brightness = 1; L.GlobalShadows = true end
-            -- // PART 2: THE COMBAT ENGINE
-
-local TargetLine = Draw("Line"); TargetLine.Thickness, TargetLine.Color = 1.5, Colors.Accent
+-- // DRAWING OBJECTS
+local TargetLine = Draw("Line"); TargetLine.Thickness, TargetLine.Color = 1.0, Colors.Accent
 local FOV_Circle = Draw("Circle"); FOV_Circle.Thickness, FOV_Circle.Filled = 1.2, false; FOV_Circle.Color = Colors.Accent
 
--- // HELPER FUNCTIONS
-local function PlayHS() if not O.Misc.HS then return end; local h = Instance.new("Sound"); h.SoundId, h.Volume, h.Parent = "rbxassetid://8041570220", 1.5, S; h:Play(); D:AddItem(h, 2) end
-local function Draw3DTr(o, e) local b = Instance.new("Part"); b.Anchored, b.CanCollide = true, false; b.Material, b.Color = Enum.Material.Neon, Colors.Accent; b.Size = Vector3.new(0.08, 0.08, (o - e).Magnitude); b.CFrame = CFrame.new(o, e) * CFrame.new(0, 0, -b.Size.Z/2); b.Parent = workspace; T:Create(b, TweenInfo.new(0.5), {Transparency=1}):Play(); D:AddItem(b, 0.5) end
+-- // SHARED STATE & CACHE
+_G.LT = nil -- Locked Target
+local VisibilityCache = {} 
+local last_auto_shoot = 0
+local next_shot_delay = 0.1
+local p_params = RaycastParams.new()
+p_params.FilterType = Enum.RaycastFilterType.Exclude
+p_params.IgnoreWater = true
 
--- // COMBAT ENGINE
-U.InputBegan:Connect(function(i, g) 
-    if not g and (i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch) and _G.LT then 
-        PlayHS()
-        local tool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool")
-        if tool then 
-            if O.Vis.Beam then local b = tool:FindFirstChild("Muzzle") or tool:FindFirstChild("Handle") if b then for i=1, O.Combat.Multi do Draw3DTr(b.Position, _G.LT.Position) end end end
-            if O.Combat.Multi > 1 then task.spawn(function() for i=2, O.Combat.Multi do tool:Activate(); task.wait(0.01) end end) end
-        end 
-    end 
-end)
+-- HUMANIZATION CONSTANTS
+local MAX_AOI = 5        -- Angle of Intent Limit (Degrees)
+local SMOOTHNESS = 0.08  -- Lower = More "Human"
+local SHAKE = 0.04       -- Procedural tremor intensity
 
+-- // UTILITY: VISIBILITY (RECYCLED PARAMS)
 local function IsVisible(char) 
-    local p = RaycastParams.new(); p.FilterType, p.FilterDescendantsInstances = 1, {LocalPlayer.Character, Cam}
-    for _, pt in pairs({char:FindFirstChild("Head"), char:FindFirstChild("UpperTorso")}) do 
-        if pt then 
-            local ori, dir = Cam.CFrame.Position, (pt.Position - Cam.CFrame.Position).Unit * 5000; local cur, pens, clear = ori, 0, false
-            while pens < 15 do 
-                local res = workspace:Raycast(cur, dir, p); if not res then break end
-                if res.Instance:IsDescendantOf(char) then clear = true break end
-                if O.Combat.S_A_WB then local f = p.FilterDescendantsInstances; table.insert(f, res.Instance); p.FilterDescendantsInstances = f; pens = pens + 1 else break end 
-            end
-            if clear then return true end 
-        end 
-    end 
-    return false 
+    if not char or not char:FindFirstChild("Head") then return false end
+    
+    -- Update params once per check
+    p_params.FilterDescendantsInstances = {LocalPlayer.Character, Cam}
+    
+    local origin = Cam.CFrame.Position
+    local targetPos = char.Head.Position
+    local result = workspace:Raycast(origin, (targetPos - origin), p_params)
+    
+    -- If the ray hits nothing or the target, it's visible
+    return (not result or result.Instance:IsDescendantOf(char))
 end
 
--- Silent Aim Hook
-local mt = getrawmetatable(game); setreadonly(mt, false); local old = mt.__namecall
-mt.__namecall = newcclosure(function(self, ...) 
-    local meth, args = getnamecallmethod(), {...}
-    if not checkcaller() and O.Combat.S_A and _G.LT and meth == "Raycast" then 
-        local ti = (_G.LT.Position - args[1]).Magnitude / O.Combat.Vel; local pos = _G.LT.Position
-        if not O.Combat.I_H and _G.LT.Parent:FindFirstChild("HumanoidRootPart") then pos = pos + (_G.LT.Parent.HumanoidRootPart.AssemblyLinearVelocity * ti) + Vector3.new(0, 0.5 * 196.2 * (ti^2), 0) end
-        args[2] = (pos - args[1]).Unit * 1000; return old(self, unpack(args)) 
+-- // SILENT AIM: THE STEALTH INTERCEPTOR \\ --
+local mt = getrawmetatable(game)
+local oldNamecall = mt.__namecall
+setreadonly(mt, false)
+
+mt.__namecall = newcclosure(function(self, ...)
+    local method = getnamecallmethod()
+    local args = {...}
+
+    -- Verify the call and ensuring a target is locked
+    if not checkcaller() and O.Combat.S_A and _G.LT and (method == "Raycast" or method == "FindPartOnRay") then
+        local targetPos = _G.LT.Position
+        local origin = (method == "Raycast") and args[1] or args[1].Origin
+        
+        -- CALCULATION: Angle of Intent
+        -- Ensures the bullet doesn't fly out at a weird angle relative to your face
+        local camDir = Cam.CFrame.LookVector
+        local targetDir = (targetPos - origin).Unit
+        local dotProduct = camDir:Dot(targetDir)
+        local angle = math.acos(math.clamp(dotProduct, -1, 1))
+        
+        if math.deg(angle) <= MAX_AOI then
+            -- PREDICTION MATH: t = distance / velocity
+            local dist = (targetPos - origin).Magnitude
+            local velocity = O.Combat.Vel > 0 and O.Combat.Vel or 900
+            local time = dist / velocity
+            
+            if not O.Combat.I_H then
+                local hrp = _G.LT.Parent:FindFirstChild("HumanoidRootPart")
+                if hrp then
+                    -- Lead: Pos + (Velocity * Time)
+                    targetPos = targetPos + (hrp.AssemblyLinearVelocity * time) 
+                    -- Drop: 0.5 * Gravity * Time^2
+                    targetPos = targetPos + Vector3.new(0, (0.5 * workspace.Gravity * (time^2)), 0)
+                end
+            end
+            
+            -- Redirect the bullet vector
+            local newDir = (targetPos - origin).Unit * 5000
+            if method == "Raycast" then args[2] = newDir else args[1] = Ray.new(origin, newDir) end
+        end
+        
+        return oldNamecall(self, unpack(args))
     end
-    return old(self, ...) 
+    return oldNamecall(self, ...)
 end)
 setreadonly(mt, true)
 
--- // ESP ENGINE
-local D_T = {}
-local function AddESP(p) if p == LocalPlayer then return end local d = {H = Instance.new("Highlight", C), B = Draw("Square"), Sk = {}, I = Draw("Text")} d.B.Thickness, d.B.Filled, d.I.Size, d.I.Outline, d.I.Center = 1.5, false, 13, true, true; for i=1,10 do table.insert(d.Sk, Draw("Line")) end D_T[p] = d end
-for _,p in pairs(P:GetPlayers()) do AddESP(p) end; P.PlayerAdded:Connect(AddESP); P.PlayerRemoving:Connect(function(p) if D_T[p] then for _,v in pairs(D_T[p].Sk) do v:Remove() end D_T[p].B:Remove(); D_T[p].I:Remove(); D_T[p].H:Destroy(); D_T[p] = nil end end)
-
--- // MAIN RENDER LOOP
+print("Part 1: Hooks and Math Loaded Successfully.")
+-- // MAIN RENDER LOOP \\ --
 table.insert(Cons, R.RenderStepped:Connect(function()
-    Cam.FieldOfView = O.Misc.Zm and 10 or O.Misc.FOV
-    LocalPlayer.CameraMaxZoomDistance = O.Misc.TP and 15 or 128
+    local myChar = LocalPlayer.Character
+    if not myChar or not myChar:FindFirstChild("HumanoidRootPart") then return end
     
+    table.clear(VisibilityCache)
     local center = Vector2.new(Cam.ViewportSize.X/2, Cam.ViewportSize.Y/2)
-    FOV_Circle.Visible = O.Vis.FOV; FOV_Circle.Radius = O.Vis.FOVSize; FOV_Circle.Position = center
-    TargetLine.Visible = false
-    
-    -- Target Logic
-    if not _G.LT or not _G.LT.Parent or _G.LT.Parent:FindFirstChild("Humanoid") == nil or _G.LT.Parent.Humanoid.Health <= 0 then 
-        local cl, d = nil, O.Combat.AimFOV
-        for p,esp in pairs(D_T) do if p.Character and p.Character:FindFirstChild("HumanoidRootPart") and p.Character.Humanoid.Health > 0 then 
-            local sP, vis = Cam:WorldToViewportPoint(p.Character.HumanoidRootPart.Position); if vis then local m = (Vector2.new(sP.X, sP.Y) - center).Magnitude
-            if m < d and IsVisible(p.Character) then d, cl = m, p.Character.Head end end end end _G.LT = cl 
+    local myHRP = myChar.HumanoidRootPart
+    local tool = myChar:FindFirstChildOfClass("Tool")
+
+    -- UPDATE WEAPON DATA
+    if tool then
+        for name, data in pairs(WeaponData) do
+            if tool.Name:lower():find(name) then
+                O.Combat.Vel = data.AP
+                break
+            end
+        end
     end
 
+    -- TARGET SELECTOR (CLOSET TO CROSSHAIR)
+    local closestTarget = nil
+    local maxDist = O.Vis.FOVSize
+    
+    for _, p in pairs(P:GetPlayers()) do
+        if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("Humanoid") and p.Character.Humanoid.Health > 0 then
+            local char = p.Character
+            local head = char:FindFirstChild("Head")
+            if head then
+                local pos, onScreen = Cam:WorldToViewportPoint(head.Position)
+                if onScreen then
+                    local mag = (Vector2.new(pos.X, pos.Y) - center).Magnitude
+                    if mag < maxDist then
+                        -- Check visibility before locking
+                        local visible = IsVisible(char)
+                        VisibilityCache[p.Name] = visible
+                        
+                        if visible then
+                            maxDist = mag
+                            closestTarget = head
+                        end
+                    end
+                end
+            end
+        end
+    end
+    _G.LT = closestTarget
+
+    -- EXECUTION: AIMBOT & TRIGGERBOT
     if _G.LT then
-        local sP, vis = Cam:WorldToViewportPoint(_G.LT.Position)
-        if O.Vis.AimTr then TargetLine.Visible = true; TargetLine.From, TargetLine.To = center, Vector2.new(sP.X, sP.Y) end
-        if O.Combat.AimBot then Cam.CFrame = Cam.CFrame:Lerp(CFrame.new(Cam.CFrame.Position, _G.LT.Position), 0.15) end
-        if O.Combat.S_A_Auto and tick() - last_auto_shoot > 0.15 and IsVisible(_G.LT.Parent) then local tool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool") if tool then last_auto_shoot = tick(); task.spawn(function() for i=1, O.Combat.Multi do tool:Activate(); task.wait(0.01) end end) end end
+        -- AIMBOT: Lerp with Procedural Shake
+        if O.Combat.AimBot then
+            local noise = Vector3.new(
+                math.noise(tick() * 2.5, 1), 
+                math.noise(1, tick() * 2.5), 
+                0
+            ) * SHAKE
+            
+            local targetCF = CFrame.new(Cam.CFrame.Position, _G.LT.Position + noise)
+            Cam.CFrame = Cam.CFrame:Lerp(targetCF, SMOOTHNESS)
+        end
+        
+        -- JITTERED TRIGGERBOT: Prevents perfect pattern detection
+        if O.Combat.S_A_Auto and (tick() - last_auto_shoot > next_shot_delay) and tool then
+            last_auto_shoot = tick()
+            next_shot_delay = math.random(8, 14) / 100 -- 0.08s to 0.14s
+            tool:Activate()
+        end
+        
+        -- SNAPLINE
+        local targetScreenPos = Cam:WorldToViewportPoint(_G.LT.Position)
+        TargetLine.Visible = true
+        TargetLine.From, TargetLine.To = center, Vector2.new(targetScreenPos.X, targetScreenPos.Y)
+    else
+        TargetLine.Visible = false
     end
 
-    -- Neural Heal
-    if O.Misc.Heal and LocalPlayer.Character and LocalPlayer.Character.Humanoid.Health < 90 and tick() - last_heal > 1 then
-        for _, it in pairs(LocalPlayer.Backpack:GetChildren()) do if it:IsA("Tool") and it.Name:lower():find("med") then LocalPlayer.Character.Humanoid:EquipTool(it); it:Activate(); last_heal = tick() break end end
-    end
+    -- FOV & VISUALS
+    FOV_Circle.Visible, FOV_Circle.Radius, FOV_Circle.Position = O.Vis.ShowFOV, O.Vis.FOVSize, center
 
-    -- AA & Weapon Sync
-    local tool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool")
-    if tool then for wName, wData in pairs(WeaponData) do if string.find(tool.Name:lower(), wName) then O.Combat.Vel = wData.AP break end end end
-    
-    if O.AA.Enabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-        LocalPlayer.Character.Humanoid.AutoRotate = false; O.AA.Y = (O.AA.Y + 45) % 360
-        LocalPlayer.Character.HumanoidRootPart.CFrame = LocalPlayer.Character.HumanoidRootPart.CFrame * CFrame.Angles(0, math.rad(O.AA.Y), 0)
-    elseif LocalPlayer.Character then LocalPlayer.Character.Humanoid.AutoRotate = true end
-
-    -- ESP Visuals
-    for p, d in pairs(D_T) do 
-        local c = p.Character; local r = c and c:FindFirstChild("HumanoidRootPart")
-        if c and r and c.Humanoid.Health > 0 and O.Vis.E then 
-            local rP, onScreen = Cam:WorldToViewportPoint(r.Position); if onScreen then 
-                local is_v = IsVisible(c); local clr = is_v and Colors.Good or Color3.new(1,1,1); d.B.Color, d.I.Color = clr, clr
-                if O.Vis.Chams then d.H.Adornee, d.H.Enabled, d.H.FillColor = c, true, clr else d.H.Enabled = false end
-                local tP = Cam:WorldToViewportPoint(r.Position + Vector3.new(0,4,0)); local bP = Cam:WorldToViewportPoint(r.Position - Vector3.new(0,4.5,0))
-                local h = math.abs(tP.Y - bP.Y); local w = h/1.8
-                d.B.Size, d.B.Position, d.B.Visible = Vector2.new(w, h), Vector2.new(rP.X-w/2, rP.Y-h/2), O.Vis.Bx
-                if O.Vis.Info then d.I.Text = math.floor(c.Humanoid.Health).." HP | "..math.floor((r.Position-LocalPlayer.Character.HumanoidRootPart.Position).Magnitude).."m"; d.I.Position = Vector2.new(rP.X, bP.Y + 10); d.I.Visible = true else d.I.Visible = false end
-                if O.Vis.Sk then local j = {{"Head","UpperTorso"},{"UpperTorso","LowerTorso"},{"UpperTorso","LeftUpperArm"},{"LeftUpperArm","LeftLowerArm"},{"UpperTorso","RightUpperArm"},{"RightUpperArm","RightLowerArm"},{"LowerTorso","LeftUpperLeg"},{"LeftUpperLeg","LeftLowerLeg"},{"LowerTorso","RightUpperLeg"},{"RightUpperLeg","RightLowerLeg"}}
-                    for i,v in ipairs(j) do local p1, p2 = c:FindFirstChild(v[1]), c:FindFirstChild(v[2]) if p1 and p2 then local v1,s1 = Cam:WorldToViewportPoint(p1.Position); local v2,s2 = Cam:WorldToViewportPoint(p2.Position) if s1 and s2 then d.Sk[i].From, d.Sk[i].To, d.Sk[i].Color, d.Sk[i].Visible = Vector2.new(v1.X,v1.Y), Vector2.new(v2.X,v2.Y), clr, true else d.Sk[i].Visible = false end end end
-                else for _,l in pairs(d.Sk) do l.Visible = false end end
-            else d.H.Enabled, d.B.Visible, d.I.Visible = false, false, false; for _,l in pairs(d.Sk) do l.Visible = false end end
-        else d.H.Enabled, d.B.Visible, d.I.Visible = false, false, false; for _,l in pairs(d.Sk) do l.Visible = false end end
+    -- ESP SYSTEM
+    for p, d in pairs(D_T) do
+        local char = p.Character
+        if char and char:FindFirstChild("HumanoidRootPart") and char:FindFirstChild("Humanoid") and char.Humanoid.Health > 0 and O.Vis.E then
+            local hrp = char.HumanoidRootPart
+            local screenPos, onScreen = Cam:WorldToViewportPoint(hrp.Position)
+            
+            if onScreen then
+                local is_vis = VisibilityCache[p.Name] or false
+                local color = is_vis and Colors.Good or Color3.new(1, 1, 1)
+                
+                -- Dynamic Box Scaling
+                local top = Cam:WorldToViewportPoint(hrp.Position + Vector3.new(0, 3, 0))
+                local bottom = Cam:WorldToViewportPoint(hrp.Position - Vector3.new(0, 3.5, 0))
+                local h = math.abs(top.Y - bottom.Y)
+                local w = h / 1.8
+                
+                d.B.Visible, d.B.Size, d.B.Color = O.Vis.Bx, Vector2.new(w, h), color
+                d.B.Position = Vector2.new(screenPos.X - w/2, screenPos.Y - h/2)
+                
+                d.I.Visible = O.Vis.Info
+                d.I.Text = string.format("[%d HP] %d m", char.Humanoid.Health, (hrp.Position - myHRP.Position).Magnitude)
+                d.I.Position = Vector2.new(screenPos.X, bottom.Y + 5)
+                
+                if O.Vis.Chams then d.H.Enabled, d.H.FillColor = true, color else d.H.Enabled = false end
+            else
+                d.B.Visible, d.I.Visible, d.H.Enabled = false, false, false
+            end
+        else
+            d.B.Visible, d.I.Visible, d.H.Enabled = false, false, false
+        end
     end
 end))
-end))
+
+print("Part 2: Main Loop and ESP Loaded Successfully.")
