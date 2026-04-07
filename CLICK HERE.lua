@@ -98,6 +98,58 @@ game:GetService("RunService").RenderStepped:Connect(function()
         end
     end
     _G.LT = closest
+        local LP, Cam = game:GetService("Players").LocalPlayer, workspace.CurrentCamera
+local last_s, next_d, VisibilityCache = 0, 0.1, {}
+local TargetLine = Draw("Line"); TargetLine.Color = Color3.fromRGB(138, 43, 226)
+
+-- // TELEPORT FUNCTION (Rage) \\ --
+local function TeleportToTarget()
+    if _G.LT and LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then
+        local targetHRP = _G.LT.Parent:FindFirstChild("HumanoidRootPart")
+        if targetHRP then
+            -- TPs 5 studs behind the target to avoid detection/instant death
+            LP.Character.HumanoidRootPart.CFrame = targetHRP.CFrame * CFrame.new(0, 0, 5)
+        end
+    end
+end
+
+-- // MAIN LOOP \\ --
+game:GetService("RunService").RenderStepped:Connect(function()
+    if not LP.Character or not LP.Character:FindFirstChild("HumanoidRootPart") then return end
+    local center = Vector2.new(Cam.ViewportSize.X/2, Cam.ViewportSize.Y/2)
+    
+    -- TARGET SELECTOR
+    local closest, maxD = nil, O.Vis.FOVSize
+    for _, p in pairs(game.Players:GetPlayers()) do
+        if p ~= LP and p.Character and p.Character:FindFirstChild("Head") and p.Character.Humanoid.Health > 0 then
+            local head = p.Character.Head
+            local pos, on = Cam:WorldToViewportPoint(head.Position)
+            if on then
+                local m = (Vector2.new(pos.X, pos.Y) - center).Magnitude
+                if m < maxD then
+                    local can, e = CheckPenetration(Cam.CFrame.Position, (head.Position - Cam.CFrame.Position), p.Character)
+                    VisibilityCache[p.Name] = {Can = can, E = e}
+                    if can then maxD, closest = m, head end
+                end
+            end
+        end
+    end
+    _G.LT = closest
+
+    -- AIMBOT & AUTOSHOOT
+    if _G.LT then
+        if O.Combat.AimBot then
+            local shake = Vector3.new(math.noise(tick()*3,1), math.noise(1,tick()*3), 0) * 0.04
+            Cam.CFrame = Cam.CFrame:Lerp(CFrame.new(Cam.CFrame.Position, _G.LT.Position + shake), 0.08)
+        end
+        if O.Combat.S_A_Auto and (tick() - last_s > next_d) then
+            last_s, next_d = tick(), math.random(8,14)/100
+            local t = LP.Character:FindFirstChildOfClass("Tool"); if t then t:Activate() end
+        end
+        local tPos = Cam:WorldToViewportPoint(_G.LT.Position)
+        TargetLine.Visible, TargetLine.From, TargetLine.To = true, center, Vector2.new(tPos.X, tPos.Y)
+    else TargetLine.Visible = false end
+end)
 
     -- AIMBOT & AUTOSHOOT
     if _G.LT then
