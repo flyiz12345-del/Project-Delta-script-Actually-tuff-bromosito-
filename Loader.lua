@@ -1,11 +1,11 @@
--- // OMEGA V16 SECURE LOADER \\ --
+-- // OMEGA V17 SECURE LOADER \\ --
 
 -- 1. link right here inside the quotes:
 local GitHub_URL = "https://raw.githubusercontent.com/flyiz12345-del/Project-Delta-script-Actually-tuff-bromosito-/refs/heads/main/CLICK%20HERE.lua"
 
 -- Send a loading notification to your screen
 game:GetService("StarterGui"):SetCore("SendNotification", {
-    Title = "⚡ OMEGA V16",
+    Title = "OMEGA V17",
     Text = "Fetching master build from GitHub...",
     Duration = 3,
 })
@@ -18,7 +18,7 @@ end)
 -- Check if it worked or if GitHub blocked the connection
 if success then
     game:GetService("StarterGui"):SetCore("SendNotification", {
-        Title = "OMEGA V16",
+        Title = "OMEGA V17",
         Text = "Injection Successful! Have fun.",
         Duration = 5,
     })
